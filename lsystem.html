@@ -4,62 +4,49 @@
 
     <!-- vertex Shader -->
     <script id="shader" type="wgsl">
-        struct VertexOutput {
-        @builtin(position) clip_position: vec4<f32>,
-        @location(0) color: vec3<f32>,
+    struct Uniforms {
+        modelMatrix : mat4x4<f32>,
+        viewMatrix  : mat4x4<f32>,
+        projMatrix  : mat4x4<f32>,
+        lightDir    : vec3<f32>,
+        _pad        : f32,
     };
 
-        struct UniformStruct {
-            theta : vec3<f32>,
-            scale : f32
-        };
+    struct VertexOutput {
+        @builtin(position) clip_position : vec4<f32>,
+        @location(0) color : vec3<f32>,
+        @location(1) normal : vec3<f32>,
+    };
 
-        @group(0) @binding(0) var<uniform> uniformStruct : UniformStruct;
+    @group(0) @binding(0) var<uniform> u : Uniforms;
 
-         @vertex
-            fn vs_main(
-        @location(0) inPos: vec3<f32>,
-        @location(1) inColor: vec3<f32>
+    @vertex
+    fn vs_main(
+        @location(0) inPos   : vec3<f32>,
+        @location(1) inColor : vec3<f32>
     ) -> VertexOutput {
-            var out: VertexOutput;
-            // Compute the sines and cosines of each rotation
-            // about each axis - must be converted into radians first
-            var c = cos(  uniformStruct.theta );
-            var s = sin(  uniformStruct.theta );
+        var out : VertexOutput;
 
-            // scale matrix
-            var scaleMat = mat4x4<f32>( uniformStruct.scale, 0.0, 0.0, 0.0,
-                0.0,  uniformStruct.scale,  0.0,  0.0,
-                             0.0, 0.0,  uniformStruct.scale,  0.0,
-                             0.0,  0.0,  0.0,  1.0 );
-            // rotation matrices
-            var rx = mat4x4<f32> ( 1.0,  0.0,  0.0,  0.0,
-                             0.0,  c.x,  s.x,  0.0,
-                             0.0, -s.x,  c.x,  0.0,
-                             0.0,  0.0,  0.0,  1.0 );
+        // Treat the line as lying roughly in the XY plane with a fake Z-up normal.
+        let worldPos = u.modelMatrix * vec4<f32>(inPos, 1.0);
+        out.clip_position = u.projMatrix * u.viewMatrix * worldPos;
 
-            var ry = mat4x4<f32> ( c.y,  0.0, -s.y,  0.0,
-                             0.0,  1.0,  0.0,  0.0,
-                             s.y,  0.0,  c.y,  0.0,
-                             0.0,  0.0,  0.0,  1.0 );
+        out.color = inColor;
+        out.normal = vec3<f32>(0.0, 0.0, 1.0); // fake normal, good enough for lines
 
-            var rz = mat4x4<f32> ( c.z,  s.z,  0.0,  0.0,
-                            -s.z,  c.z,  0.0,  0.0,
-                             0.0,  0.0,  1.0,  0.0,
-                             0.0,  0.0,  0.0,  1.0 );
+        return out;
+    }
 
+    @fragment
+    fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
+        let n = normalize(in.normal);
+        let l = normalize(u.lightDir);
+        let ndotl = max(dot(n, l), 0.1); // keep at least some ambient
 
-            out.clip_position = rz * ry * rx * scaleMat * vec4<f32>(inPos, 1.0);
-            out.color = inColor;
-            return out;
-           }
-
-           @fragment
-           fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-        return vec4<f32>(in.color, 1.0);
-           }
-
+        return vec4<f32>(in.color * ndotl, 1.0);
+    }
     </script>
+
    
     <!-- include the shape creation functions -->
     <script type="text/javascript" src="./cgIShape.js"></script>

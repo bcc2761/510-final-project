@@ -219,7 +219,19 @@ function createPipeline(vertexBufferLayoutDesc, colorBufferLayoutDesc) {
 
     pipeline = device.createRenderPipeline(pipelineDesc);
 
-    uniformValues = new Float32Array([angles[0], angles[1], angles[2], scale]);
+    // new Float32Array([angles[0], angles[1], angles[2], scale]);
+    uniformValues = new Float32Array(
+        16 + // model
+        16 + // view
+        16 + // proj
+        4    // lightDir + padding
+    );
+
+    uniformBuffer = device.createBuffer({
+        size: uniformValues.byteLength,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
     uniformBuffer = device.createBuffer({
         size: uniformValues.byteLength,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,

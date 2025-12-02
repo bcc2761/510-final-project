@@ -1,6 +1,6 @@
 <html>
 <head>
-    <title>CSCI-510: L-System Example + Assignment 2</title>
+    <title>CSCI-510: Final Project, L-System Tesselation</title>
 
     <script id="shader" type="wgsl">
         struct VertexOutput {
@@ -115,15 +115,6 @@
             }
             // ---------------------------
 
-            else if (key == 'f') {
-                if (iterations2 > 1) iterations2 -= 1;
-                createLSystem('sierpinski');
-            }
-            else if (key == 'F') {
-                iterations2 += 1;
-                createLSystem('sierpinski');
-            }
-
             draw();
         }
     </script>
@@ -136,7 +127,8 @@
 </head>
 
 <body>
-  <h1>CSCI-510: L-System Trees</h1>
+  <h1>CSCI-510: Final Project, L-System Tesselation</h1>
+  <h2>Anna Leung & Bennett Chang</h2>
   <table>
       <tr>
           <td><canvas id="webgpu" width="800" height="800">
@@ -151,7 +143,6 @@
                       <tr><td>2</td><td>Sympodial Tree</td></tr>
                       <tr><td>3</td><td>Stochastic Tree</td></tr>
                       <tr><td>c / C</td><td>Decrease/Increase Iterations (Trees)</td></tr>
-                      <tr><td>f / F</td><td>Decrease/Increase Iterations (Sierpinski)</td></tr>
                       <tr><td>x, y, z</td><td>Rotate View</td></tr>
                       <tr><td>+, -</td><td>Zoom</td></tr>
                       <tr><td>r</td><td>Reset View</td></tr>

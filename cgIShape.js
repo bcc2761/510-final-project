@@ -10,8 +10,6 @@ let initial_length,
     colors; // Linked to the global colors array in lsystemMain.js
 
 var iterations = 4;
-var iterations2 = 4; // Default for Sierpinski
-
 //
 // Initialize grammar variables (called by main)
 //
@@ -113,17 +111,6 @@ function createGrammar(type) {
         initial_length = 0.1 / Math.pow(1.2, iterations - 4);
         return run(iterations, start);
     }
-    else if (type === 'sierpinski') {
-        // 4. Legacy Sierpinski Support
-        let start = "A"; 
-        rules = { 
-            'A': "B-A-B", 
-            'B': "A+B+A" 
-        };
-        angleToUse = 60.0;
-        initial_length = 0.8 / Math.pow(2, iterations2); 
-        return run(iterations2, start);
-    } 
     else { 
         // Default Fallback
         return createGrammar('fractal');
@@ -137,12 +124,7 @@ function drawGrammarPoints(grammarArray, type) {
     colors = []; // Clear colors
     // Ensure points array is cleared in lsystemMain, but we append here
     
-    if (type === 'sierpinski') {
-        drawSierpinski(grammarArray);
-    } else {
-        // All trees use the standard "Turtle" Plant drawer
-        drawPlant(grammarArray);
-    }
+    drawPlant(grammarArray);
 }
 
 //
@@ -151,7 +133,7 @@ function drawGrammarPoints(grammarArray, type) {
 function drawPlant(grammarArray) {
     // Turtle State
     let x = 0.0;
-    let y = -0.8; // Start near bottom
+    let y = -1.95; // Start near bottom
     let angle = 90.0; // Start pointing UP
     let z = 0.25;
 
@@ -206,37 +188,6 @@ function drawPlant(grammarArray) {
     }
 }
 
-//
-// Legacy Sierpinski Drawer
-//
-function drawSierpinski(grammarArray) {
-    let angle = 0.0; 
-    let x = -0.4;
-    let y = -0.4;
-    let z = 0.25;
-
-    for (let i = 0; i < grammarArray.length; i++) {
-        let cmd = grammarArray[i];
-        if (cmd === 'A' || cmd === 'B') {
-             let rad = radians(angle);
-             let nextX = x + initial_length * Math.cos(rad);
-             let nextY = y + initial_length * Math.sin(rad);
-
-             addLine([x, y, z], [nextX, nextY, z]);
-             
-             // Alternating colors for Sierpinski
-             if(cmd === 'A') addColor([1.0, 0.3, 0.3]);
-             else addColor([0.3, 0.3, 1.0]);
-
-             x = nextX;
-             y = nextY;
-        } else if (cmd === '+') {
-            angle += angleToUse;
-        } else if (cmd === '-') {
-            angle -= angleToUse;
-        }
-    }
-}
 
 //
 // Utilities

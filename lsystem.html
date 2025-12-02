@@ -1,0 +1,164 @@
+<html>
+<head>
+    <title>CSCI-510: L-System Example + Assignment 2</title>
+
+    <script id="shader" type="wgsl">
+        struct VertexOutput {
+            @builtin(position) aVertexPosition: vec4<f32>,
+            @location(0) color: vec3<f32>, 
+        };
+
+        struct UniformStruct {
+             theta : vec3<f32>,
+             scale : f32
+        };
+
+        @group(0) @binding(0) var<uniform> uniformStruct : UniformStruct;
+
+        @vertex
+        fn vs_main(
+            @location(0) inPos: vec3<f32>,
+            @location(1) inColor: vec3<f32> 
+        ) -> VertexOutput {
+            var out: VertexOutput;
+            var c = cos(uniformStruct.theta);
+            var s = sin(uniformStruct.theta);
+
+            // standard transformation matrices
+            var scale = mat4x4<f32>(
+                uniformStruct.scale, 0.0, 0.0, 0.0,
+                0.0, uniformStruct.scale, 0.0, 0.0,
+                0.0, 0.0, uniformStruct.scale, 0.0,
+                0.0, 0.0, 0.0, 1.0
+            );
+
+            var rx = mat4x4<f32>(
+                1.0, 0.0, 0.0, 0.0,
+                0.0, c.x, s.x, 0.0,
+                0.0, -s.x, c.x, 0.0,
+                0.0, 0.0, 0.0, 1.0
+            );
+
+            var ry = mat4x4<f32>(
+                c.y, 0.0, -s.y, 0.0,
+                0.0, 1.0, 0.0, 0.0,
+                s.y, 0.0, c.y, 0.0,
+                0.0, 0.0, 0.0, 1.0
+            );
+
+            var rz = mat4x4<f32>(
+                c.z, s.z, 0.0, 0.0,
+                -s.z, c.z, 0.0, 0.0,
+                0.0, 0.0, 1.0, 0.0,
+                0.0, 0.0, 0.0, 1.0
+            );
+
+            out.aVertexPosition = rz * ry * rx * scale * vec4<f32>(inPos, 1.0);
+            out.color = inColor; 
+            return out;
+        }
+
+        @fragment
+        fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+            return vec4<f32>(in.color, 1.0);
+        }
+    </script>
+   
+    <script type="text/javascript" src="./cgIShape.js"></script>
+
+    <script type="text/javascript" src="./lsystemMain.js"></script>
+
+    <script type="text/javascript">
+        function gotKey(event) {
+            var key = event.key;
+
+            // Rotation
+            if (key == 'x') angles[0] -= angleInc;
+            else if (key == 'y') angles[1] -= angleInc;
+            else if (key == 'z') angles[2] -= angleInc;
+            else if (key == 'X') angles[0] += angleInc;
+            else if (key == 'Y') angles[1] += angleInc;
+            else if (key == 'Z') angles[2] += angleInc;
+
+            // Scale
+            else if (key == '+') scale *= 1.0/scaleInc;
+            else if (key == '-') scale *= scaleInc;
+            
+            // Reset
+            else if (key == 'r' || key == 'R') {
+                angles = [...anglesReset];
+                scale = scaleReset;
+            }
+            
+            // Iteration Controls
+            else if (key == 'c') {
+                if (iterations > 1) iterations -= 1;
+                createLSystem(currentType); 
+            }
+            else if (key == 'C') {
+                iterations += 1;
+                createLSystem(currentType);
+            }
+
+            // --- TREE TYPE SELECTORS ---
+            else if (key == '1') {
+                currentType = 'fractal';
+                createLSystem('fractal');
+            }
+            else if (key == '2') {
+                currentType = 'sympodial';
+                createLSystem('sympodial');
+            }
+            else if (key == '3') {
+                currentType = 'stochastic';
+                createLSystem('stochastic');
+            }
+            // ---------------------------
+
+            else if (key == 'f') {
+                if (iterations2 > 1) iterations2 -= 1;
+                createLSystem('sierpinski');
+            }
+            else if (key == 'F') {
+                iterations2 += 1;
+                createLSystem('sierpinski');
+            }
+
+            draw();
+        }
+    </script>
+
+    <script type="text/javascript">
+        // Globals for selection memory
+        var currentType = 'fractal';
+        window.onload = init;
+    </script>
+</head>
+
+<body>
+  <h1>CSCI-510: L-System Trees</h1>
+  <table>
+      <tr>
+          <td><canvas id="webgpu" width="800" height="800">
+            Your browser does not support the HTML5 canvas element.
+          </canvas></td>
+          
+          <td>
+              <h3>Controls</h3>
+              <table border="1">
+                  <tbody>
+                      <tr><td>1</td><td>Fractal Plant</td></tr>
+                      <tr><td>2</td><td>Sympodial Tree</td></tr>
+                      <tr><td>3</td><td>Stochastic Tree</td></tr>
+                      <tr><td>c / C</td><td>Decrease/Increase Iterations (Trees)</td></tr>
+                      <tr><td>f / F</td><td>Decrease/Increase Iterations (Sierpinski)</td></tr>
+                      <tr><td>x, y, z</td><td>Rotate View</td></tr>
+                      <tr><td>+, -</td><td>Zoom</td></tr>
+                      <tr><td>r</td><td>Reset View</td></tr>
+                  </tbody>
+              </table>
+          </td>
+      </tr>
+  </table>
+</body>
+</html>

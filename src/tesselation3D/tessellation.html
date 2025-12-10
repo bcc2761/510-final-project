@@ -12,7 +12,8 @@
 
 
          struct UniformStruct {
-             theta : vec4<f32>
+             theta : vec4<f32>,
+             coralColor : vec4<f32>
          };
 
          @group(0) @binding(0) var<uniform> uniformStruct : UniformStruct;
@@ -73,7 +74,7 @@
                 let sand = vec4<f32>(0.95, 0.90, 0.65, 1.0);
 
                 // Tree / coral color
-                let coral = vec4<f32>(0.6, 0.6, 0.6, 1.0);
+                let coral = uniformStruct.coralColor;
 
                 var fragColor = coral;
 
@@ -125,6 +126,11 @@
                 curShape = TREE;
                 generateNewTree();
             }
+
+            else if (key === 'b' || key === 'B') {
+                coralMode = 1 - coralMode; // toggle red <-> blue
+            }
+
 
             // tessellation control
             else if (key == '+') {
@@ -191,6 +197,9 @@
               <tr>
               <td>1, c</td>
               <td>Generate a new stochastic tree (using current tessellation settings)</td>
+              </tr>
+              <td>b</td>
+              <td>Change coral color</td>
               </tr>
               <tr>
               <td>+, -</td>

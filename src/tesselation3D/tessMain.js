@@ -50,6 +50,12 @@ let verticesSize,
   var CUBE = 4;
   var curShape = TREE;
 
+  // 0 = red, 1 = blue
+let coralMode = 0;
+const CORAL_RED  = [1.0, 0.2, 0.2, 1.0];
+const CORAL_BLUE = [0.2, 0.4, 1.0, 1.0];
+
+
 // set up the shader var's
 function setShaderInfo() {
     // set up the shader code var's
@@ -205,7 +211,7 @@ function createNewShape() {
         entries: [
             {
                 binding: 0,
-                visibility: GPUShaderStage.VERTEX,
+                visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
                 buffer: {}
             }
         ]
@@ -284,7 +290,8 @@ function createNewShape() {
     });
 
 
-    uniformValues = new Float32Array(angles);
+    // uniformValues = new Float32Array(angles);
+    uniformValues = new Float32Array(8); // 4 for theta, 4 for color
     uniformBuffer = device.createBuffer({
         size: uniformValues.byteLength,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -361,9 +368,16 @@ function draw() {
     };
 
     // convert to radians before sending to shader
+    // rotation
     uniformValues[0] = radians(angles[0]);
     uniformValues[1] = radians(angles[1]);
     uniformValues[2] = radians(angles[2]);
+    uniformValues[3] = 0.0;
+
+    // coral color
+    const c = (coralMode === 0) ? CORAL_RED : CORAL_BLUE;
+    uniformValues.set(c, 4);
+
 
     // copy the values from JavaScript to the GPU
     device.queue.writeBuffer(uniformBuffer, 0, uniformValues);

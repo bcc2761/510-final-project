@@ -19,6 +19,7 @@ let verticesSize,
     colorState,
     shaderModule,
     pipeline,
+    skyPipeline,
     renderPassDesc,
     commandEncoder,
     passEncoder,
@@ -52,6 +53,18 @@ let verticesSize,
   var CONE = 3;
   var CUBE = 4;
   var curShape = TREE;
+
+  // oral colors
+let coralMode = 0;
+const CORAL_BASE_COLORS = [
+    [1.0, 0.2, 0.2, 1.0],  // red
+    [0.2, 1.0, 0.2, 1.0],  // green
+    [0.2, 0.4, 1.0, 1.0],  // blue
+    [0.2, 1.0, 1.0, 1.0],  // cyan
+    [1.0, 0.4, 0.7, 1.0],  // pink
+];
+
+
 
 // set up the shader var's
 function setShaderInfo() {
@@ -118,7 +131,11 @@ function createNewShape() {
     setShaderInfo();
     points = []; indices = []; bary = [];
 
-    if (curShape == TREE) makeStochasticTree(division1);
+    if (curShape == TREE) {
+        makeGroundPlane(4.0, -1.0);
+        makeStochasticTree(division1);
+    }
+
     else if (curShape == CYLINDER) makeCylinder(division1, division2);
     else if (curShape == CONE) makeCone(division1, division2);
     else if (curShape == CUBE) makeStochasticTree(division1); // Add this
@@ -204,7 +221,7 @@ function createNewShape() {
         entries: [
             {
                 binding: 0,
-                visibility: GPUShaderStage.VERTEX,
+                visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
                 buffer: {}
             }
         ]
@@ -241,9 +258,50 @@ function createNewShape() {
         }
     };
 
+    // background pipeline
     pipeline = device.createRenderPipeline(pipelineDesc);
 
-    uniformValues = new Float32Array(angles);
+        const skyShaderCode = `
+        @vertex
+        fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4<f32> {
+        let pos = array<vec2f, 6>(
+            vec2f(-1, -1), vec2f( 1, -1), vec2f(-1,  1),
+            vec2f(-1,  1), vec2f( 1, -1), vec2f( 1,  1)
+        );
+        return vec4f(pos[i], 0.999, 1.0);
+        }
+
+        @fragment
+        fn fs(@builtin(position) p: vec4<f32>) -> @location(0) vec4<f32> {
+        let t = clamp(p.y / 800.0, 0.0, 1.0);
+        let sky = mix(
+            vec3f(0.6, 0.8, 1.0),
+            vec3f(0.1, 0.2, 0.5),
+            t
+        );
+        return vec4f(sky, 1.0);
+        }
+        `;
+
+        
+        const skyModule = device.createShaderModule({ code: skyShaderCode });
+
+        skyPipeline = device.createRenderPipeline({
+        layout: "auto",
+        vertex: { module: skyModule, entryPoint: "vs" },
+        fragment: { module: skyModule, entryPoint: "fs", targets: [colorState] },
+        primitive: { topology: "triangle-list" },
+
+        depthStencil: {
+            depthWriteEnabled: false,   // important!
+            depthCompare: 'less',
+            format: 'depth24plus',
+        },
+    });
+
+
+    // uniformValues = new Float32Array(angles);
+    uniformValues = new Float32Array(8); // 4 for theta, 4 for color
     uniformBuffer = device.createBuffer({
         size: uniformValues.byteLength,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -265,6 +323,31 @@ function createNewShape() {
 
     // indicate a redraw is required.
     updateDisplay = true;
+}
+
+async function loadTexture(url) {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+
+    const bitmap = await createImageBitmap(img);
+
+    const texture = device.createTexture({
+        size: [bitmap.width, bitmap.height, 1],
+        format: "rgba8unorm",
+        usage:
+            GPUTextureUsage.TEXTURE_BINDING |
+            GPUTextureUsage.COPY_DST |
+            GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+
+    device.queue.copyExternalImageToTexture(
+        { source: bitmap },
+        { texture: texture },
+        [bitmap.width, bitmap.height]
+    );
+
+    return texture;
 }
 
 // We call draw to render to our canvas
@@ -295,9 +378,16 @@ function draw() {
     };
 
     // convert to radians before sending to shader
+    // rotation
     uniformValues[0] = radians(angles[0]);
     uniformValues[1] = radians(angles[1]);
     uniformValues[2] = radians(angles[2]);
+    uniformValues[3] = 0.0;
+
+    // coral color
+    const c = CORAL_BASE_COLORS[coralMode];
+    uniformValues.set(c, 4);
+
 
     // copy the values from JavaScript to the GPU
     device.queue.writeBuffer(uniformBuffer, 0, uniformValues);
@@ -306,6 +396,10 @@ function draw() {
     commandEncoder = device.createCommandEncoder();
     passEncoder = commandEncoder.beginRenderPass(renderPassDesc);
     passEncoder.setViewport(0, 0,canvas.width, canvas.height, 0, 1);
+    // draw the sky first
+    passEncoder.setPipeline(skyPipeline);
+    passEncoder.draw(6);
+    // now draw the coral
     passEncoder.setPipeline(pipeline);
     passEncoder.setBindGroup(0, uniformBindGroup);
     passEncoder.setVertexBuffer(0, myVertexBuffer);
@@ -321,18 +415,11 @@ function draw() {
 
   // Entry point to our application
 async function init() {
-    // Retrieve the canvas
     canvas = document.querySelector("canvas");
-
-    // deal with keypress
     window.addEventListener('keydown', gotKey, false);
 
-    // Read, compile, and link your shaders
     await initProgram();
 
-    // create and bind your current object
     createNewShape();
-
-    // do a draw
     draw();
 }

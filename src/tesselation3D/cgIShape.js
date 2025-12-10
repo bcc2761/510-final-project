@@ -7,6 +7,8 @@ let rules = {};
 let angleToUse = 22.5;
 let initial_length = 0.5;
 let storedGrammar = null;
+let growthIterations = 3;
+
 
 //
 // 1. HELPER: Vector Math (Needed to orient cylinders in 3D space)
@@ -36,12 +38,14 @@ function runLSystem(iterations, startString) {
 
     // Define Stochastic Rules
     rules = {
-        'F': [
-            { prob: 0.33, res: "F[+F]F[-F]F" },
-            { prob: 0.33, res: "F[+F]F" },
-            { prob: 0.34, res: "F[-F]F" }
-        ]
+    'F': [
+        { prob: 0.25, res: "F[+F][-F]" },
+        { prob: 0.25, res: "F[+F]" },
+        { prob: 0.25, res: "F[-F]" },
+        { prob: 0.25, res: "[+F][-F]" }
+    ]
     };
+
 
     for (let i = 0; i < iterations; i++) {
         for (let j = 0; j < grammarArray.length; j++) {
@@ -114,9 +118,8 @@ function makeBranchSegment(p1, p2, radius, radialDivs) {
 }
 
 function generateNewTree() {
-    let iterations = 3;
     let startString = "F";
-    storedGrammar = runLSystem(iterations, startString);
+    storedGrammar = runLSystem(growthIterations, startString);
 }
 
 //
@@ -204,6 +207,12 @@ function makeStochasticTree(subdivisions) {
                 break;
         }
     }
+}
+function makeGroundPlane(size = 2.0, y = -1.0) {
+    const half = size / 2;
+
+    addTriangle(-half, y, -half,  half, y, -half, -half, y,  half);
+    addTriangle( half, y, -half,  half, y,  half, -half, y,  half);
 }
 
 function makeCube(subdivisions) {

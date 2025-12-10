@@ -104,14 +104,17 @@
 
             // tessellation control
             else if (key == '+') {
-                division1 = division1 + 1;
+                growthIterations++;
+                generateNewTree();
             }
+
             else if (key == '=') {
                 division2 = division2 + 1;
             }
             else if (key == '-') {
-                if (division1 > 1) {
-                    division1 = division1 - 1;
+                if (growthIterations > 1) {
+                    growthIterations--;
+                    generateNewTree();
                 }
             }
             else if (key == '_') {

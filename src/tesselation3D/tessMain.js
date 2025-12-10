@@ -15,6 +15,9 @@ let verticesSize,
     colorState,
     shaderModule,
     pipeline,
+    skyPipeline,
+    // sandPipeline,
+    // sandBindGroup,
     renderPassDesc,
     commandEncoder,
     passEncoder,
@@ -114,7 +117,11 @@ function createNewShape() {
     setShaderInfo();
     points = []; indices = []; bary = [];
 
-    if (curShape == TREE) makeStochasticTree(division1);
+    if (curShape == TREE) {
+        makeGroundPlane(4.0, -1.0);
+        makeStochasticTree(division1);
+    }
+
     else if (curShape == CYLINDER) makeCylinder(division1, division2);
     else if (curShape == CONE) makeCone(division1, division2);
     else if (curShape == CUBE) makeStochasticTree(division1); // Add this
@@ -237,7 +244,121 @@ function createNewShape() {
         }
     };
 
+    // background pipeline
     pipeline = device.createRenderPipeline(pipelineDesc);
+        // const sandShaderCode = `
+        // @group(0) @binding(0) var sandTex : texture_2d<f32>;
+        // @group(0) @binding(1) var sandSampler : sampler;
+
+        // struct VSOut {
+        //     @builtin(position) pos : vec4<f32>,
+        //     @location(0) uv : vec2<f32>
+        // };
+
+        // @vertex
+        // fn vs(@builtin(vertex_index) i : u32) -> VSOut {
+        //     var pos = array<vec2f, 6>(
+        //         vec2f(-1.0, -1.0),
+        //         vec2f( 1.0, -1.0),
+        //         vec2f(-1.0,  1.0),
+        //         vec2f(-1.0,  1.0),
+        //         vec2f( 1.0, -1.0),
+        //         vec2f( 1.0,  1.0)
+        //     );
+
+        //     var uv = array<vec2f, 6>(
+        //         vec2f(0.0, 0.0),
+        //         vec2f(4.0, 0.0),
+        //         vec2f(0.0, 4.0),
+        //         vec2f(0.0, 4.0),
+        //         vec2f(4.0, 0.0),
+        //         vec2f(4.0, 4.0)
+        //     );
+
+        //     var out : VSOut;
+        //     out.pos = vec4f(pos[i].x, pos[i].y, 0.8, 1.0);
+        //     out.uv = uv[i];
+        //     return out;
+        // }
+
+        // @fragment
+        // fn fs(in : VSOut) -> @location(0) vec4<f32> {
+        //     return textureSample(sandTex, sandSampler, in.uv);
+        // }
+        // `;
+
+        const skyShaderCode = `
+        @vertex
+        fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4<f32> {
+        let pos = array<vec2f, 6>(
+            vec2f(-1, -1), vec2f( 1, -1), vec2f(-1,  1),
+            vec2f(-1,  1), vec2f( 1, -1), vec2f( 1,  1)
+        );
+        return vec4f(pos[i], 0.999, 1.0);
+        }
+
+        @fragment
+        fn fs(@builtin(position) p: vec4<f32>) -> @location(0) vec4<f32> {
+        let t = clamp(p.y / 800.0, 0.0, 1.0);
+        let sky = mix(
+            vec3f(0.6, 0.8, 1.0),
+            vec3f(0.1, 0.2, 0.5),
+            t
+        );
+        return vec4f(sky, 1.0);
+        }
+        `;
+
+        // const sandModule = device.createShaderModule({ code: sandShaderCode });
+
+        // const sandBindGroupLayout = device.createBindGroupLayout({
+        //     entries: [
+        //         {
+        //             binding: 0,
+        //             visibility: GPUShaderStage.FRAGMENT,
+        //             texture: { sampleType: "float" }
+        //         },
+        //         {
+        //             binding: 1,
+        //             visibility: GPUShaderStage.FRAGMENT,
+        //             sampler: { type: "filtering" }
+        //         }
+        //     ]
+        // });
+
+        // sandPipeline = device.createRenderPipeline({
+        //     layout: device.createPipelineLayout({
+        //         bindGroupLayouts: [sandBindGroupLayout]
+        //     }),
+        //     vertex: { module: sandModule, entryPoint: "vs" },
+        //     fragment: {
+        //         module: sandModule,
+        //         entryPoint: "fs",
+        //         targets: [colorState],
+        //     },
+        //     primitive: { topology: "triangle-list" },
+        //     depthStencil: {
+        //         depthWriteEnabled: false,
+        //         depthCompare: "always",
+        //         format: "depth24plus",
+        //     }
+        // });
+
+        const skyModule = device.createShaderModule({ code: skyShaderCode });
+
+        skyPipeline = device.createRenderPipeline({
+        layout: "auto",
+        vertex: { module: skyModule, entryPoint: "vs" },
+        fragment: { module: skyModule, entryPoint: "fs", targets: [colorState] },
+        primitive: { topology: "triangle-list" },
+
+        depthStencil: {
+            depthWriteEnabled: false,   // important!
+            depthCompare: 'less',
+            format: 'depth24plus',
+        },
+    });
+
 
     uniformValues = new Float32Array(angles);
     uniformBuffer = device.createBuffer({
@@ -261,6 +382,31 @@ function createNewShape() {
 
     // indicate a redraw is required.
     updateDisplay = true;
+}
+
+async function loadTexture(url) {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+
+    const bitmap = await createImageBitmap(img);
+
+    const texture = device.createTexture({
+        size: [bitmap.width, bitmap.height, 1],
+        format: "rgba8unorm",
+        usage:
+            GPUTextureUsage.TEXTURE_BINDING |
+            GPUTextureUsage.COPY_DST |
+            GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+
+    device.queue.copyExternalImageToTexture(
+        { source: bitmap },
+        { texture: texture },
+        [bitmap.width, bitmap.height]
+    );
+
+    return texture;
 }
 
 // We call draw to render to our canvas
@@ -302,6 +448,14 @@ function draw() {
     commandEncoder = device.createCommandEncoder();
     passEncoder = commandEncoder.beginRenderPass(renderPassDesc);
     passEncoder.setViewport(0, 0,canvas.width, canvas.height, 0, 1);
+    // draw the sky first
+    passEncoder.setPipeline(skyPipeline);
+    passEncoder.draw(6);
+    // // sand
+    // passEncoder.setPipeline(sandPipeline);
+    // passEncoder.setBindGroup(0, sandBindGroup);
+    // passEncoder.draw(6);
+    // now draw the coral
     passEncoder.setPipeline(pipeline);
     passEncoder.setBindGroup(0, uniformBindGroup);
     passEncoder.setVertexBuffer(0, myVertexBuffer);
@@ -317,18 +471,29 @@ function draw() {
 
   // Entry point to our application
 async function init() {
-    // Retrieve the canvas
     canvas = document.querySelector("canvas");
-
-    // deal with keypress
     window.addEventListener('keydown', gotKey, false);
 
-    // Read, compile, and link your shaders
     await initProgram();
 
-    // create and bind your current object
     createNewShape();
 
-    // do a draw
+    // const sandTexture = await loadTexture("sand.png");
+
+    // const sandSampler = device.createSampler({
+    //     magFilter: "linear",
+    //     minFilter: "linear",
+    //     addressModeU: "repeat",
+    //     addressModeV: "repeat",
+    // });
+
+    // sandBindGroup = device.createBindGroup({
+    //     layout: sandBindGroupLayout,
+    //     entries: [
+    //         { binding: 0, resource: sandTexture.createView() },
+    //         { binding: 1, resource: sandSampler }
+    //     ],
+    // });
+
     draw();
 }

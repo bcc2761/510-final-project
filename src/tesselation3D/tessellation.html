@@ -5,9 +5,11 @@
     <!-- vertex Shader -->
     <script id="shader" type="wgsl">
         struct VertexOutput {
-                      @builtin(position) aVertexPosition: vec4<f32>,
-                      @location(0) bary: vec3<f32>,
-          };
+            @builtin(position) aVertexPosition: vec4<f32>,
+            @location(0) bary: vec3<f32>,
+            @location(1) worldY: f32,
+        };
+
 
          struct UniformStruct {
              theta : vec4<f32>
@@ -52,20 +54,42 @@
                              0.0,  0.0,  0.0,  1.0 );
 
 
-            out.aVertexPosition =  trans * rz * ry * rx * scale * vec4<f32>(inPos.x, inPos.y, inPos.z, 1);
+           let worldPos = trans * rz * ry * rx * scale *
+                        vec4<f32>(inPos.x, inPos.y, inPos.z, 1);
+
+            out.aVertexPosition = worldPos;
             out.bary = bary;
+
+            // IMPORTANT: pass original model Y
+            out.worldY = inPos.y;
+
             return out;
            }
 
            @fragment
-           fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-                var fragColor = vec4<f32> (0.5, 0.5, 0.5, 1.0 );
-                // if on the edge, draw black, otherwsie, draw grey
-                if (in.bary.x < 0.01 || in.bary.y < 0.01 || in.bary.z < 0.01) {
-                    fragColor = vec4 (1.0, 1.0, 1.0, 1.0);
+            fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+
+                // Pale yellow sand
+                let sand = vec4<f32>(0.95, 0.90, 0.65, 1.0);
+
+                // Tree / coral color
+                let coral = vec4<f32>(0.6, 0.6, 0.6, 1.0);
+
+                var fragColor = coral;
+
+                // Ground lives at y = -1.0
+                if (in.worldY < -0.9) {
+                    fragColor = sand;
                 }
+
+                // Wireframe edges
+                if (in.bary.x < 0.01 || in.bary.y < 0.01 || in.bary.z < 0.01) {
+                    fragColor = vec4<f32>(1.0);
+                }
+
                 return fragColor;
-           }
+            }
+
 
     </script>
    

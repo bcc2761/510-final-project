@@ -50,10 +50,16 @@ let verticesSize,
   var CUBE = 4;
   var curShape = TREE;
 
-  // 0 = red, 1 = blue
+  // oral colors
 let coralMode = 0;
-const CORAL_RED  = [1.0, 0.2, 0.2, 1.0];
-const CORAL_BLUE = [0.2, 0.4, 1.0, 1.0];
+const CORAL_BASE_COLORS = [
+    [1.0, 0.2, 0.2, 1.0],  // red
+    [0.2, 1.0, 0.2, 1.0],  // green
+    [0.2, 0.4, 1.0, 1.0],  // blue
+    [0.2, 1.0, 1.0, 1.0],  // cyan
+    [1.0, 0.4, 0.7, 1.0],  // pink
+];
+
 
 
 // set up the shader var's
@@ -375,7 +381,7 @@ function draw() {
     uniformValues[3] = 0.0;
 
     // coral color
-    const c = (coralMode === 0) ? CORAL_RED : CORAL_BLUE;
+    const c = CORAL_BASE_COLORS[coralMode];
     uniformValues.set(c, 4);
 
 

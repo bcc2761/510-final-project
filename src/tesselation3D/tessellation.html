@@ -134,7 +134,7 @@
             }
 
             else if (key === 'b' || key === 'B') {
-                coralMode = 1 - coralMode; // toggle red <-> blue
+                coralMode = (coralMode + 1) % CORAL_BASE_COLORS.length;
             }
 
 

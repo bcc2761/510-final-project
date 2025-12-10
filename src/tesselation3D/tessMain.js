@@ -1,4 +1,8 @@
-  'use strict';
+// tessMain.js - 3D Tesselation Edition
+// Bennett Chang, Anna Leung
+// CSCI-510
+
+'use strict';
 
   // Global variables that are set and used
   // across the application

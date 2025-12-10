@@ -1,5 +1,5 @@
 // cgIShape.js
-// Bennett Chang
+// Bennett Chang, Anna Leung
 // CSCI-510
 
 'use strict';
@@ -154,7 +154,7 @@ function drawPlant(grammarArray) {
                 addLine([x, y, z], [nextX, nextY, z]);
                 
                 // Color (Woody Brown)
-                // You can get fancy here: mix green if it's a leaf (terminal branch)
+                // Can get fancy here: mix green if it's a leaf (terminal branch)
                 addColor([0.55, 0.27, 0.07]); 
 
                 // Move Turtle

@@ -1,5 +1,5 @@
 // lsystemMain.js
-// Bennett Chang
+// Bennett Chang, Anna Leung
 // CSCI-510
 
 'use strict';

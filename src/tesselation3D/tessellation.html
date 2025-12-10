@@ -1,6 +1,12 @@
+<!-- 
+tessellation.html
+Bennett Chang, Anna Leung
+CSCI-510 
+-->
+
 <html>
 <head>
-    <title>CSCI-510: Tessellation</title>
+    <title>CSCI-510: Final Project, L-System Tesselation</title>
 
     <!-- vertex Shader -->
     <script id="shader" type="wgsl">
@@ -97,7 +103,7 @@
                 angles[2] += angleInc;
 
             // shape selection
-            else if (key == '1' || key == 'c') {
+            else if (key == 'g' || key == 'G') {
                 curShape = TREE;
                 generateNewTree();
             }
@@ -141,7 +147,8 @@
 </head>
 
 <body>
-  <h1>CSCI-510: Tessellation</h1>
+  <h1>CSCI-510: Final Project, L-System Tessellation</h1>
+  <h2>Anna Leung & Bennett Chang</h2>
   <table>
       <tr>
           <td><canvas id="webgpu" width="800" height="800">
@@ -162,7 +169,7 @@
               <td>Rotate the current shape backward about the x, y, or z axis</td>
               </tr>
               <tr>
-              <td>1, c</td>
+              <td>g, G</td>
               <td>Generate a new stochastic tree (using current tessellation settings)</td>
               </tr>
               <tr>

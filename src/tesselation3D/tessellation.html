@@ -14,13 +14,13 @@ CSCI-510
             @builtin(position) aVertexPosition: vec4<f32>,
             @location(0) bary: vec3<f32>,
             @location(1) isGround: f32,
-            @location(2) localPos: vec3<f32> // NEW: Store position for pattern
+            @location(2) localPos: vec3<f32> // Used for the seabed pattern
         };
 
         struct UniformStruct {
-             theta : vec4<f32>,
-             coralColor : vec4<f32>,
-             cameraPos : vec4<f32>
+             theta : vec4<f32>,       // Rotation angles
+             coralColor : vec4<f32>,  // Coral color
+             cameraPos : vec4<f32>    // Camera X and Y offset
         };
 
         @group(0) @binding(0) var<uniform> uniformStruct : UniformStruct;
@@ -30,73 +30,85 @@ CSCI-510
                    @location(1) bary : vec3<f32>) -> VertexOutput {
             var out: VertexOutput;
 
-            // 1. Standard Rotation Setup
-            var c = cos(uniformStruct.theta);
-            var s = sin(uniformStruct.theta);
+            // --- 1. DEFINE PROJECTION (The "Camera Lens") ---
+            // This replaces the manual scaling and defines a large "safe zone"
+            // for Z-depth (-5.0 to 5.0) so nothing gets clipped.
+            let left = -2.0;   let right = 2.0;
+            let bottom = -2.0; let top = 2.0;
+            let near = -5.0;   let far = 5.0;
 
-            // 2. Camera & Transform Setup
-            var trans = mat4x4<f32> ( 
+            let w = 1.0 / (right - left);
+            let h = 1.0 / (top - bottom);
+            let p = 1.0 / (far - near);
+
+            var proj = mat4x4<f32>(
+                2.0 * w,  0.0,      0.0,      0.0,
+                0.0,      2.0 * h,  0.0,      0.0,
+                0.0,      0.0,      p,        0.0,
+               -(right+left)*w, -(top+bottom)*h, -near*p, 1.0
+            );
+
+            // --- 2. DEFINE VIEW (Camera Movement) ---
+            // Uses the WASD values sent from JavaScript
+            var view = mat4x4<f32>(
                 1.0, 0.0, 0.0, 0.0,
                 0.0, 1.0, 0.0, 0.0,
                 0.0, 0.0, 1.0, 0.0,
-                uniformStruct.cameraPos.x, uniformStruct.cameraPos.y, 0.5, 1.0 
+                uniformStruct.cameraPos.x, uniformStruct.cameraPos.y, 0.0, 1.0
             );
 
-            // Scale (kept at 0.35 to prevent clipping)
-            var scale = mat4x4<f32> ( 
-                0.35, 0.0, 0.0, 0.0,
-                0.0, 0.35, 0.0, 0.0,
-                0.0, 0.0, 0.35, 0.0,
+            // --- 3. DEFINE ROTATION (Object Rotation) ---
+            var c = cos(uniformStruct.theta);
+            var s = sin(uniformStruct.theta);
+
+            var rx = mat4x4<f32> ( 
+                1.0, 0.0, 0.0, 0.0,
+                0.0, c.x, s.x, 0.0,
+                0.0, -s.x, c.x, 0.0,
                 0.0, 0.0, 0.0, 1.0 
             );
 
-            var rx = mat4x4<f32> ( 1.0, 0.0, 0.0, 0.0,
-                             0.0, c.x, s.x, 0.0,
-                             0.0, -s.x, c.x, 0.0,
-                             0.0, 0.0, 0.0, 1.0 );
+            var ry = mat4x4<f32> ( 
+                c.y, 0.0, -s.y, 0.0,
+                0.0, 1.0, 0.0, 0.0,
+                s.y, 0.0, c.y, 0.0,
+                0.0, 0.0, 0.0, 1.0 
+            );
 
-            var ry = mat4x4<f32> ( c.y, 0.0, -s.y, 0.0,
-                             0.0, 1.0, 0.0, 0.0,
-                             s.y, 0.0, c.y, 0.0,
-                             0.0, 0.0, 0.0, 1.0 );
+            var rz = mat4x4<f32> ( 
+                c.z, s.z, 0.0, 0.0,
+                -s.z, c.z, 0.0, 0.0,
+                0.0, 0.0, 1.0, 0.0,
+                0.0, 0.0, 0.0, 1.0 
+            );
 
-            var rz = mat4x4<f32> ( c.z, s.z, 0.0, 0.0,
-                            -s.z, c.z, 0.0, 0.0,
-                             0.0, 0.0, 1.0, 0.0,
-                             0.0, 0.0, 0.0, 1.0 );
-
-            let worldPos = trans * rz * ry * rx * scale * vec4<f32>(inPos, 1.0);
+            // Combine: Projection * View * Rotation * Vertex
+            let worldPos = proj * view * rz * ry * rx * vec4<f32>(inPos, 1.0);
 
             out.aVertexPosition = worldPos;
             out.bary = bary;
-            out.isGround = select(0.0, 1.0, inPos.y < -0.74);
-            out.localPos = inPos; // Pass the local model position to fragment
+            out.localPos = inPos; // Pass original position for texturing
+            out.isGround = select(0.0, 1.0, inPos.y < -1.74);
 
             return out;
         }
 
         @fragment
         fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-
-            // Define Base Sand Color
-            let sandBase = vec4<f32>(0.95, 0.90, 0.65, 1.0);
+            
+            // 1. Define Colors
+            let sandLight = vec4<f32>(0.95, 0.90, 0.65, 1.0);
+            let sandDark  = vec4<f32>(0.85, 0.80, 0.55, 1.0);
             var finalColor = vec4<f32>(0.0);
 
+            // 2. Determine Surface Color
             if (in.isGround > 0.5) {
-                // --- SEABED PATTERN ---
-                // Create a grid pattern using Sine waves on X and Z
-                // We use localPos so the pattern stays stuck to the box
-                let freq = 10.0; 
-                let pattern = sin(in.localPos.x * freq) * sin(in.localPos.z * freq);
-                
-                // Mix between light and slightly dark sand based on pattern
-                if (pattern > 0.0) {
-                     finalColor = sandBase;
-                } else {
-                     finalColor = sandBase * 0.9; // Darker tile
-                }
+                // Checkerboard Pattern for Seabed
+                // Uses localPos so the texture sticks to the object
+                let pattern = step(0.0, sin(in.localPos.x * 10.0) * sin(in.localPos.z * 10.0));
+                finalColor = mix(sandDark, sandLight, pattern);
             } else {
-                // --- CORAL GRADIENT ---
+                // Coral Gradient
                 let base = uniformStruct.coralColor.rgb;
                 let h = clamp(in.bary.y + 0.5, 0.0, 1.0);
                 let dark  = base * 0.4;
@@ -104,9 +116,10 @@ CSCI-510
                 finalColor = vec4<f32>(mix(dark, light, h), 1.0);
             }
 
-            // --- BLACK WIREFRAME ---
+            // 3. Black Wireframe Edges
+            // Checks if the pixel is near the edge of a triangle
             if (in.bary.x < 0.02 || in.bary.y < 0.02 || in.bary.z < 0.02) {
-                finalColor = vec4<f32>(0.0, 0.0, 0.0, 1.0); // Black
+                finalColor = vec4<f32>(0.0, 0.0, 0.0, 1.0);
             }
 
             return finalColor;
@@ -167,7 +180,7 @@ CSCI-510
             // tessellation control
             else if (key == '+') {
                 growthIterations++;
-                generateNewTree();
+                updateTreeDepth();
             }
 
             else if (key == '=') {
@@ -176,7 +189,7 @@ CSCI-510
             else if (key == '-') {
                 if (growthIterations > 1) {
                     growthIterations--;
-                    generateNewTree();
+                    updateTreeDepth();
                 }
             }
             else if (key == '_') {
@@ -208,51 +221,55 @@ CSCI-510
 </head>
 
 <body>
-  <h1>CSCI-510: Final Project, L-System Tessellation</h1>
-  <h2>Anna Leung & Bennett Chang</h2>
-  <table>
-      <tr>
-          <td><canvas id="webgpu" width="800" height="800">
+<h1>CSCI-510: Final Project, L-System Tessellation</h1>
+<h2>Anna Leung & Bennett Chang</h2>
+<table>
+    <tr>
+        <td><canvas id="webgpu" width="800" height="800">
             Your browser does not support the HTML5 canvas element.
-          </canvas></td>
-          
-          <td>
-              <h3>Controls</h3>
-              
-              <table border="1">
-              <tbody>
-              <tr>
-              <td>x, y, z</td>
-              <td>Rotate the current shape forward about the x, y, or z axis</td>
-              </tr>
-              <tr>
-              <td>X, Y, Z</td>
-              <td>Rotate the current shape backward about the x, y, or z axis</td>
-              </tr>
-              <tr>
-              <td>g, G</td>
-              <td>Generate a new stochastic tree (using current tessellation settings)</td>
-              </tr>
-              <td>b</td>
-              <td>Change coral color</td>
-              </tr>
-              <tr>
-              <td>+, -</td>
-              <td>Increment/decrement the primary subdivision of the current shape by 1</td>
-              </tr>
-              <tr>
-              <td>=, _</td>
-              <td>Increment/decrement the secondary subdivision of the current shape by 1</td>
-              </tr>
-              <tr>
-              <td>r, R</td>
-              <td>Reset the figure to its original orientation</td>
-              </tr>
-              </tbody>
-              </table>
-              
-          </td>
-      </tr>
-  </table>
+        </canvas></td>
+        
+        <td>
+            <h3>Controls</h3>
+            
+            <table border="1">
+            <tbody>
+            <tr>
+            <td>x / y / z</td>
+                <td>Rotate the current shape forward about the x, y, or z axis</td>
+            </tr>
+            <tr>
+                <td>X / Y / Z</td>
+                <td>Rotate the current shape backward about the x, y, or z axis</td>
+            </tr>
+            <tr>
+                <td>g / G</td>
+                <td>Generate a new stochastic tree (using current tessellation settings)</td>
+            </tr>
+            <td>b / B</td>
+                <td>Change coral color</td>
+            </tr>
+            <tr>
+            <td>+ / -</td>
+                <td>Increment/decrement the primary subdivision of the current shape by 1</td>
+            </tr>
+            <tr>
+                <td>= / _</td>
+                <td>Increment/decrement the secondary subdivision of the current shape by 1</td>
+            </tr>
+            <tr>
+                <td>r / R</td>
+                <td>Reset the figure to its original orientation</td>
+            </tr>
+            <tr>
+                <td>w / W, a / A, s / S, d / D</td>
+                <td>Pan the camera up, left, down, right</td>
+            </tr>
+            </tbody>
+            </table>
+            
+        </td>
+    </tr>
+</table>
 </body>
 </html>

@@ -137,7 +137,7 @@ function createNewShape() {
 
     if (curShape == TREE) {
         // makeGroundPlane(4.0, -0.75);
-        makeGroundBox(2.0, -0.75);
+        makeGroundBox(4.0, -1.75);
         makeStochasticTree(division1);
     }
     else console.error(`Bad object type`);

@@ -8,7 +8,7 @@ let angleToUse = 22.5;
 let initial_length = 0.5;
 let storedGrammar = null;
 let growthIterations = 3;
-
+let grammarHistory = ["F"]; // To preserve previous grammars
 
 //
 // 1. Helper: Vector Math (Needed to orient cylinders in 3D space)
@@ -32,47 +32,144 @@ function scaleVec(v, s) { return [v[0]*s, v[1]*s, v[2]*s]; }
 //
 // 2. Stochastic Grammar Generator
 //
-function runLSystem(iterations, startString) {
-    let grammarArray = startString.split('');
-    let doubleBuffer = [];
 
-    // Define Stochastic Rules
+//
+// Global cache to store the grammar at each iteration level
+
+//
+// Modified Helper: Runs ONE iteration of rules on a string
+//
+function iterateGrammar(startString) {
+    let grammarArray = startString.split('');
+    let nextGrammar = [];
+
+    // Define Stochastic Rules (Same as before)
     rules = {
-    'F': [
-        { prob: 0.25, res: "F[+F][-F]" },
-        { prob: 0.25, res: "F[+F]" },
-        { prob: 0.25, res: "F[-F]" },
-        { prob: 0.25, res: "[+F][-F]" }
-    ]
+        'F': [
+            { prob: 0.20, res: "F[+F][-F]" },
+            { prob: 0.20, res: "F[&F][^F]" },
+            { prob: 0.20, res: "F[+&F][-^F]" },
+            { prob: 0.20, res: "[+F][-F][&F][^F]" },
+            { prob: 0.20, res: "F[&+F]" },
+            { prob: 0.20, res: "F[<+F][>&F]" }
+        ]
     };
 
+    for (let j = 0; j < grammarArray.length; j++) {
+        let char = grammarArray[j];
+        let rule = rules[char];
 
-    for (let i = 0; i < iterations; i++) {
-        for (let j = 0; j < grammarArray.length; j++) {
-            let char = grammarArray[j];
-            let rule = rules[char];
-
-            if (rule && Array.isArray(rule)) {
-                let rand = Math.random();
-                let cumulative = 0.0;
-                let selected = rule[rule.length - 1].res;
-                for (let k = 0; k < rule.length; k++) {
-                    cumulative += rule[k].prob;
-                    if (rand <= cumulative) {
-                        selected = rule[k].res;
-                        break;
-                    }
+        if (rule && Array.isArray(rule)) {
+            let rand = Math.random();
+            let cumulative = 0.0;
+            let selected = rule[rule.length - 1].res;
+            for (let k = 0; k < rule.length; k++) {
+                cumulative += rule[k].prob;
+                if (rand <= cumulative) {
+                    selected = rule[k].res;
+                    break;
                 }
-                doubleBuffer = doubleBuffer.concat(selected.split(''));
-            } else {
-                doubleBuffer.push(char);
             }
+            nextGrammar = nextGrammar.concat(selected.split(''));
+        } else {
+            nextGrammar.push(char);
         }
-        grammarArray = [...doubleBuffer];
-        doubleBuffer = [];
     }
-    return grammarArray;
+    return nextGrammar.join('');
 }
+
+//
+// Called by 'G' key: Completely new tree
+//
+function generateNewTree() {
+    // Reset history
+    grammarHistory = ["F"];
+    
+    let current = "F";
+    // Rebuild up to the current iteration count
+    for (let i = 0; i < growthIterations; i++) {
+        current = iterateGrammar(current);
+        grammarHistory.push(current);
+    }
+    storedGrammar = current.split('');
+}
+
+//
+// Called by '+' and '-' keys: Keeps existing structure
+//
+function updateTreeDepth() {
+    // 1. If we are shrinking (-), or growing to a level we already visited
+    if (growthIterations < grammarHistory.length) {
+        storedGrammar = grammarHistory[growthIterations].split('');
+    } 
+    // 2. If we are growing deeper (+) than we have ever been
+    else {
+        // Start from the last known state
+        let current = grammarHistory[grammarHistory.length - 1];
+        
+        // Add new layers until we reach the target
+        while (grammarHistory.length <= growthIterations) {
+            current = iterateGrammar(current);
+            grammarHistory.push(current);
+        }
+        storedGrammar = current.split('');
+    }
+}
+// function runLSystem(iterations, startString) {
+//     let grammarArray = startString.split('');
+//     let doubleBuffer = [];
+
+//     // Define Stochastic Rules
+//     // We now mix standard Left/Right (+/-) with Forward/Back (&/^)
+//     rules = {
+//     'F': [
+//         // Rule 1: Standard Planar Split (Left/Right)
+//         { prob: 0.20, res: "F[+F][-F]" },
+        
+//         // Rule 2: 3D Split (Forward/Backward)
+//         { prob: 0.20, res: "F[&F][^F]" },
+        
+//         // Rule 3: Diagonal Split (Right+Forward, Left+Back)
+//         { prob: 0.20, res: "F[+&F][-^F]" },
+        
+//         // Rule 4: "Bushy" Split (Grow in 4 directions)
+//         { prob: 0.20, res: "[+F][-F][&F][^F]" },
+        
+//         // Rule 5: Simple growth with a twist
+//         { prob: 0.20, res: "F[&+F]" },
+
+//         // Rule 6: Spiral growth
+//         { prob: 0.20, res: "F[<+F][>&F]" }
+//     ]
+//     };
+
+
+//     for (let i = 0; i < iterations; i++) {
+//         for (let j = 0; j < grammarArray.length; j++) {
+//             let char = grammarArray[j];
+//             let rule = rules[char];
+
+//             if (rule && Array.isArray(rule)) {
+//                 let rand = Math.random();
+//                 let cumulative = 0.0;
+//                 let selected = rule[rule.length - 1].res;
+//                 for (let k = 0; k < rule.length; k++) {
+//                     cumulative += rule[k].prob;
+//                     if (rand <= cumulative) {
+//                         selected = rule[k].res;
+//                         break;
+//                     }
+//                 }
+//                 doubleBuffer = doubleBuffer.concat(selected.split(''));
+//             } else {
+//                 doubleBuffer.push(char);
+//             }
+//         }
+//         grammarArray = [...doubleBuffer];
+//         doubleBuffer = [];
+//     }
+//     return grammarArray;
+// }
 
 //
 // 3. Draw Branch (Connects Point A to Point B with a Cylinder Mesh)
@@ -117,10 +214,10 @@ function makeBranchSegment(p1, p2, radius, radialDivs) {
     }
 }
 
-function generateNewTree() {
-    let startString = "F";
-    storedGrammar = runLSystem(growthIterations, startString);
-}
+// function generateNewTree() {
+//     let startString = "F";
+//     storedGrammar = runLSystem(growthIterations, startString);
+// }
 
 //
 // 4. Main Tree Function (Called by tessMain)
@@ -137,7 +234,7 @@ function makeStochasticTree(subdivisions) {
 
     // B. Turtle State (3D)
     // Start slightly lower as requested previously
-    let x = 0.0, y = -0.75, z = 0.0; 
+    let x = 0.0, y = -1.75, z = 0.0; 
     let angleX = 0, angleY = 0, angleZ = 0; 
     let step = 0.2;
     let radius = 0.03;
@@ -193,6 +290,9 @@ function makeStochasticTree(subdivisions) {
             case '-': angleZ -= angleToUse; break;
             case '&': angleX += angleToUse; break; // Pitch (if you want 3D)
             case '^': angleX -= angleToUse; break;
+            // --- NEW: Add Roll Support ---
+            case '<': angleY += angleToUse; break; // Roll Left
+            case '>': angleY -= angleToUse; break; // Roll Right
             case '[': 
                 stack.push({x, y, z, angleX, angleY, angleZ});
                 step *= 0.9; // Branches get shorter

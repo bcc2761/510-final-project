@@ -9,99 +9,109 @@ CSCI-510
     <title>CSCI-510: Final Project, L-System Tesselation</title>
 
     <!-- vertex Shader -->
-    <script id="shader" type="wgsl">
+<script id="shader" type="wgsl">
         struct VertexOutput {
             @builtin(position) aVertexPosition: vec4<f32>,
             @location(0) bary: vec3<f32>,
             @location(1) isGround: f32,
+            @location(2) localPos: vec3<f32> // NEW: Store position for pattern
         };
 
-
-         struct UniformStruct {
+        struct UniformStruct {
              theta : vec4<f32>,
-             coralColor : vec4<f32>
-         };
+             coralColor : vec4<f32>,
+             cameraPos : vec4<f32>
+        };
 
-         @group(0) @binding(0) var<uniform> uniformStruct : UniformStruct;
+        @group(0) @binding(0) var<uniform> uniformStruct : UniformStruct;
 
-         @vertex
-            fn vs_main(
-                      @location(0) inPos: vec3<f32>,
-        @location(1) bary : vec3<f32>) -> VertexOutput {
+        @vertex
+        fn vs_main(@location(0) inPos: vec3<f32>,
+                   @location(1) bary : vec3<f32>) -> VertexOutput {
             var out: VertexOutput;
-            // Compute the sines and cosines of each rotation
-            // about each axis - must be converted into radians first
-            var c = cos(  uniformStruct.theta );
-            var s = sin(  uniformStruct.theta );
 
-            // translation matrix
-            var trans = mat4x4<f32> ( 1.0,  0.0,  0.0,  0.0,
-                             0.0,  1.0,  0.0,  0.0,
-                             0.0, 0.0,  1.0,  0.0,
-                             0.0,  0.0, 0.5,  1.0 );
-            // scale matrix
-            var scale = mat4x4<f32> ( 1.0,  0.0,  0.0,  0.0,
-                             0.0,  1.0,  0.0,  0.0,
-                             0.0, 0.0,  1.0,  0.0,
-                             0.0,  0.0,  0.0,  1.0 );
-            // rotation matrices
-            var rx = mat4x4<f32> ( 1.0,  0.0,  0.0,  0.0,
-                             0.0,  c.x,  s.x,  0.0,
-                             0.0, -s.x,  c.x,  0.0,
-                             0.0,  0.0,  0.0,  1.0 );
+            // 1. Standard Rotation Setup
+            var c = cos(uniformStruct.theta);
+            var s = sin(uniformStruct.theta);
 
-            var ry = mat4x4<f32> ( c.y,  0.0, -s.y,  0.0,
-                             0.0,  1.0,  0.0,  0.0,
-                             s.y,  0.0,  c.y,  0.0,
-                             0.0,  0.0,  0.0,  1.0 );
+            // 2. Camera & Transform Setup
+            var trans = mat4x4<f32> ( 
+                1.0, 0.0, 0.0, 0.0,
+                0.0, 1.0, 0.0, 0.0,
+                0.0, 0.0, 1.0, 0.0,
+                uniformStruct.cameraPos.x, uniformStruct.cameraPos.y, 0.5, 1.0 
+            );
 
-            var rz = mat4x4<f32> ( c.z,  s.z,  0.0,  0.0,
-                            -s.z,  c.z,  0.0,  0.0,
-                             0.0,  0.0,  1.0,  0.0,
-                             0.0,  0.0,  0.0,  1.0 );
+            // Scale (kept at 0.35 to prevent clipping)
+            var scale = mat4x4<f32> ( 
+                0.35, 0.0, 0.0, 0.0,
+                0.0, 0.35, 0.0, 0.0,
+                0.0, 0.0, 0.35, 0.0,
+                0.0, 0.0, 0.0, 1.0 
+            );
 
+            var rx = mat4x4<f32> ( 1.0, 0.0, 0.0, 0.0,
+                             0.0, c.x, s.x, 0.0,
+                             0.0, -s.x, c.x, 0.0,
+                             0.0, 0.0, 0.0, 1.0 );
 
-           let worldPos = trans * rz * ry * rx * scale *
-                        vec4<f32>(inPos.x, inPos.y, inPos.z, 1);
+            var ry = mat4x4<f32> ( c.y, 0.0, -s.y, 0.0,
+                             0.0, 1.0, 0.0, 0.0,
+                             s.y, 0.0, c.y, 0.0,
+                             0.0, 0.0, 0.0, 1.0 );
+
+            var rz = mat4x4<f32> ( c.z, s.z, 0.0, 0.0,
+                            -s.z, c.z, 0.0, 0.0,
+                             0.0, 0.0, 1.0, 0.0,
+                             0.0, 0.0, 0.0, 1.0 );
+
+            let worldPos = trans * rz * ry * rx * scale * vec4<f32>(inPos, 1.0);
 
             out.aVertexPosition = worldPos;
             out.bary = bary;
-
-            // Ground plane is exactly at y = -1 in model space
-            out.isGround = select(0.0, 1.0, inPos.y < -0.99);
-
-
+            out.isGround = select(0.0, 1.0, inPos.y < -0.74);
+            out.localPos = inPos; // Pass the local model position to fragment
 
             return out;
-           }
+        }
 
-           @fragment
-            fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+        @fragment
+        fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
-                let sand = vec4<f32>(0.95, 0.90, 0.65, 1.0);
-                // color
-                if (in.isGround > 0.5) {
-                    return sand;
+            // Define Base Sand Color
+            let sandBase = vec4<f32>(0.95, 0.90, 0.65, 1.0);
+            var finalColor = vec4<f32>(0.0);
+
+            if (in.isGround > 0.5) {
+                // --- SEABED PATTERN ---
+                // Create a grid pattern using Sine waves on X and Z
+                // We use localPos so the pattern stays stuck to the box
+                let freq = 10.0; 
+                let pattern = sin(in.localPos.x * freq) * sin(in.localPos.z * freq);
+                
+                // Mix between light and slightly dark sand based on pattern
+                if (pattern > 0.0) {
+                     finalColor = sandBase;
+                } else {
+                     finalColor = sandBase * 0.9; // Darker tile
                 }
-                // color gradient
+            } else {
+                // --- CORAL GRADIENT ---
                 let base = uniformStruct.coralColor.rgb;
-
-                // simple vertical gradient along branch
                 let h = clamp(in.bary.y + 0.5, 0.0, 1.0);
-
                 let dark  = base * 0.4;
                 let light = base + vec3<f32>(0.4);
-
-                var fragColor = vec4<f32>(mix(dark, light, h), 1.0);
-
-                // wireframe
-                if (in.bary.x < 0.01 || in.bary.y < 0.01 || in.bary.z < 0.01) {
-                    fragColor = vec4<f32>(1.0);
-                }
-
-                return fragColor;
+                finalColor = vec4<f32>(mix(dark, light, h), 1.0);
             }
 
+            // --- BLACK WIREFRAME ---
+            if (in.bary.x < 0.02 || in.bary.y < 0.02 || in.bary.z < 0.02) {
+                finalColor = vec4<f32>(0.0, 0.0, 0.0, 1.0); // Black
+            }
+
+            return finalColor;
+        }
+    </script>
 
 
     </script>
@@ -132,6 +142,16 @@ CSCI-510
                 angles[1] += angleInc;
             else if (key == 'Z')
                 angles[2] += angleInc;
+
+            // camera pan
+            if (key == 'w' || key == 'W')
+                camY += 0.1;
+            else if (key == 's' || key == 'S')
+                camY -= 0.1;
+            else if (key == 'a' || key == 'A')
+                camX -= 0.1;
+            else if (key == 'd' || key == 'D')
+                camX += 0.1;
 
             // shape selection
             else if (key == 'g' || key == 'G') {
@@ -170,6 +190,8 @@ CSCI-510
                 angles[0] = anglesReset[0];
                 angles[1] = anglesReset[1];
                 angles[2] = anglesReset[2];
+                camX = 0.0;
+                camY = 0.0;
             }
 
             // create a new shape and do a redo a draw
@@ -232,9 +254,5 @@ CSCI-510
           </td>
       </tr>
   </table>
-  
-  
-
 </body>
 </html>
-

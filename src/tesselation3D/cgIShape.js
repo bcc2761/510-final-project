@@ -137,7 +137,7 @@ function makeStochasticTree(subdivisions) {
 
     // B. Turtle State (3D)
     // Start slightly lower as requested previously
-    let x = 0.0, y = -1.0, z = 0.0; 
+    let x = 0.0, y = -0.75, z = 0.0; 
     let angleX = 0, angleY = 0, angleZ = 0; 
     let step = 0.2;
     let radius = 0.03;
@@ -208,162 +208,41 @@ function makeStochasticTree(subdivisions) {
         }
     }
 }
-function makeGroundPlane(size = 2.0, y = -1.0) {
+
+// function makeGroundPlane(size = 2.0, y = -1.0) {
+//     const half = size / 2;
+
+//     addTriangle(-half, y, -half,  half, y, -half, -half, y,  half);
+//     addTriangle( half, y, -half,  half, y,  half, -half, y,  half);
+// }
+
+// Replaces makeGroundPlane
+function makeGroundBox(size, yTop) {
     const half = size / 2;
+    const yBot = yTop - 0.3; // Thickness of the slab
 
-    addTriangle(-half, y, -half,  half, y, -half, -half, y,  half);
-    addTriangle( half, y, -half,  half, y,  half, -half, y,  half);
+    // 1. Top Face (The sand)
+    addTriangle(-half, yTop, -half,  half, yTop, -half, -half, yTop,  half);
+    addTriangle( half, yTop, -half,  half, yTop,  half, -half, yTop,  half);
+
+    // 2. Bottom Face
+    addTriangle(-half, yBot,  half,  half, yBot,  half, -half, yBot, -half);
+    addTriangle( half, yBot,  half,  half, yBot, -half, -half, yBot, -half);
+
+    // 3. Side Faces (Optional, but good for completeness)
+    // Front
+    addTriangle(-half, yTop,  half,  half, yTop,  half, -half, yBot,  half);
+    addTriangle( half, yTop,  half,  half, yBot,  half, -half, yBot,  half);
+    // Back
+    addTriangle( half, yTop, -half, -half, yTop, -half, -half, yBot, -half);
+    addTriangle( half, yTop, -half, -half, yBot, -half,  half, yBot, -half);
+    // Left
+    addTriangle(-half, yTop, -half, -half, yTop,  half, -half, yBot, -half);
+    addTriangle(-half, yTop,  half, -half, yBot,  half, -half, yBot, -half);
+    // Right
+    addTriangle( half, yTop,  half,  half, yTop, -half,  half, yBot, -half);
+    addTriangle( half, yTop,  half,  half, yBot, -half,  half, yBot,  half);
 }
-
-// function makeCube(subdivisions) {
-//     const halfSize = 0.25; // Half the length of the cube's side
-//     const start = -halfSize; // Starting coordinate
-//     const stepSize = (halfSize * 2) / subdivisions; // Size of each subdivision
-//     let x0, y0, z0, x1, y1, z1; // Temporary variables for coordinates
-
-//     for (let i = 0; i < subdivisions; i++) { // Loop through each subdivision in one direction
-//         for (let j = 0; j < subdivisions; j++) {
-//             // top (+Y)
-//             x0 = start + i * stepSize;
-//             x1 = start + (i + 1) * stepSize;
-//             y1 = halfSize;
-//             z0 = start + j * stepSize;
-//             z1 = start + (j + 1) * stepSize;
-//             addTriangle(x0, y1, z0, x0, y1, z1, x1, y1, z0); // first triangle
-//             addTriangle(x1, y1, z0, x0, y1, z1, x1, y1, z1); // second triangle
-
-//             // bottom (-Y)
-//             y0 = -halfSize; // y-coordinate for bottom face
-//             addTriangle(x0, y0, z0, x1, y0, z0, x0, y0, z1); // first triangle
-//             addTriangle(x1, y0, z0, x1, y0, z1, x0, y0, z1); // second triangle
-
-//             // front (+Z)
-//             x0 = start + i * stepSize; // x-coordinate for front face
-//             x1 = start + (i + 1) * stepSize; // next x-coordinate
-//             y0 = start + j * stepSize; // y-coordinate
-//             y1 = start + (j + 1) * stepSize; // next y-coordinate
-//             z1 = halfSize; // z-coordinate for front face
-//             addTriangle(x0, y0, z1, x1, y0, z1, x0, y1, z1); // first triangle
-//             addTriangle(x1, y0, z1, x1, y1, z1, x0, y1, z1); // second triangle
-
-//             // back (-Z)
-//             z0 = -halfSize;
-//             addTriangle(x0, y0, z0, x0, y1, z0, x1, y0, z0); // first triangle
-//             addTriangle(x1, y0, z0, x0, y1, z0, x1, y1, z0); // second triangle
-
-//             // left (-X)
-//             x0 = -halfSize; // x-coordinate for left face
-//             y0 = start + i * stepSize; // y-coordinate
-//             y1 = start + (i + 1) * stepSize; // next y-coordinate
-//             z0 = start + j * stepSize; // z-coordinate
-//             z1 = start + (j + 1) * stepSize; // next z-coordinate
-//             addTriangle(x0, y0, z0, x0, y0, z1, x0, y1, z0); // first triangle
-//             addTriangle(x0, y1, z0, x0, y0, z1, x0, y1, z1); // second triangle
-
-//             // right (+X)
-//             x1 = halfSize; // x-coordinate for right face
-//             addTriangle(x1, y0, z0, x1, y1, z0, x1, y0, z1); // first triangle
-//             addTriangle(x1, y1, z0, x1, y1, z1, x1, y0, z1); // second triangle
-//         }
-//     }
-// }
-
-// //
-// // fill in code that creates the triangles for a cylinder with diameter 0.5
-// // and height of 0.5 (centered at the origin) with the number of subdivisions
-// // around the base and top of the cylinder (given by radialdivision) and
-// // the number of subdivisions along the surface of the cylinder given by
-// //heightdivision.
-// //
-// function makeCylinder(radialdivision, heightdivision) {
-//     const radius = 0.25; // Radius of the cylinder
-//     const height = 0.5; // Height of the cylinder
-//     const y_base = -0.25; // Y-coordinate of the base
-//     const y_top = 0.25; // Y-coordinate of the top
-
-//     const angle_step = (2 * Math.PI) / radialdivision; // Angle between each division
-//     const height_step = height / heightdivision; // Height of each division
-
-//     for (let i = 0; i < radialdivision; i++) { // Loop through each radial division
-//         let angle1 = i * angle_step;
-//         let angle2 = (i + 1) * angle_step;
-
-//         let x1 = radius * Math.cos(angle1); // X-coordinate for first angle
-//         let z1 = radius * Math.sin(angle1); // Z-coordinate for first angle
-//         let x2 = radius * Math.cos(angle2); // X-coordinate for second angle
-//         let z2 = radius * Math.sin(angle2); // Z-coordinate for second angle
-
-//         // Top Cap
-//         addTriangle(0, y_top, 0, x2, y_top, z2, x1, y_top, z1);
-
-//         // Bottom Cap
-//         addTriangle(0, y_base, 0, x1, y_base, z1, x2, y_base, z2);
-
-//         // Side
-//         for (let j = 0; j < heightdivision; j++) {
-//             let y1 = y_base + j * height_step;
-//             let y2 = y_base + (j + 1) * height_step;
-
-//             addTriangle(x1, y1, z1, x1, y2, z1, x2, y2, z2);
-//             addTriangle(x1, y1, z1, x2, y2, z2, x2, y1, z2);
-//         }
-//     }
-// }
-
-// //
-// // fill in code that creates the triangles for a cone with diameter 0.5
-// // and height of 0.5 (centered at the origin) with the number of
-// // subdivisions around the base of the cone (given by radialdivision)
-// // and the number of subdivisions along the surface of the cone
-// //given by heightdivision.
-// //
-// function makeCone(radialdivision, heightdivision) {
-//     const radius = 0.25; // Radius of the base of the cone
-//     const height = 0.5; // Height of the cone
-//     const y_base = -0.25; // Y-coordinate of the base
-//     const y_tip = 0.25; // Y-coordinate of the tip
-
-//     const angle_step = (2 * Math.PI) / radialdivision; // Angle between each division
-//     const height_step = height / heightdivision; // Height of each division
-
-//     for (let i = 0; i < radialdivision; i++) { // Loop through each radial division
-//         let angle1 = i * angle_step;
-//         let angle2 = (i + 1) * angle_step;
-
-//         // Base vertices
-//         let x_base1 = radius * Math.cos(angle1); // X-coordinate for first base vertex
-//         let z_base1 = radius * Math.sin(angle1); // Z-coordinate for first base vertex
-//         let x_base2 = radius * Math.cos(angle2); // X-coordinate for second base vertex
-//         let z_base2 = radius * Math.sin(angle2); // Z-coordinate for second base vertex
-
-//         // Bottom Cap
-//         addTriangle(0, y_base, 0, x_base1, y_base, z_base1, x_base2, y_base, z_base2);
-
-//         // Side
-//         for (let j = 0; j < heightdivision; j++) {
-//             let y1 = y_base + j * height_step;
-//             let y2 = y_base + (j + 1) * height_step;
-
-//             // Radius at y1 and y2
-//             let r1 = radius * (y_tip - y1) / height;
-//             let r2 = radius * (y_tip - y2) / height;
-
-//             // Vertices for the quad on the side
-//             let p1x = r1 * Math.cos(angle1);
-//             let p1z = r1 * Math.sin(angle1);
-//             let p2x = r1 * Math.cos(angle2);
-//             let p2z = r1 * Math.sin(angle2);
-//             let p3x = r2 * Math.cos(angle1);
-//             let p3z = r2 * Math.sin(angle1);
-//             let p4x = r2 * Math.cos(angle2);
-//             let p4z = r2 * Math.sin(angle2);
-
-//             addTriangle(p1x, y1, p1z, p3x, y2, p3z, p4x, y2, p4z);
-//             addTriangle(p1x, y1, p1z, p4x, y2, p4z, p2x, y1, p2z);
-//         }
-//     }
-// }
-
 
 // Standard helpers
 function radians(degrees) { return degrees * (Math.PI/180); }

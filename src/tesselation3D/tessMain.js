@@ -43,9 +43,13 @@ let verticesSize,
   var division1 = 3;
   var division2 = 1;
   var updateDisplay = true;
-  var anglesReset = [30.0, 30.0, 0.0, 0.0];
-  var angles = [30.0, 30.0, 0.0, 0.0];
+  var anglesReset = [0.0, 0.0, 0.0, 0.0];
+  var angles = [0.0, 0.0, 0.0, 0.0];
   var angleInc = 5.0;
+
+  // Camera angles
+  var camX = 0.0;
+  var camY = 0.0;
   
   // Shapes we can draw
   var TREE = 1;
@@ -132,13 +136,10 @@ function createNewShape() {
     points = []; indices = []; bary = [];
 
     if (curShape == TREE) {
-        makeGroundPlane(4.0, -1.0);
+        // makeGroundPlane(4.0, -0.75);
+        makeGroundBox(2.0, -0.75);
         makeStochasticTree(division1);
     }
-
-    else if (curShape == CYLINDER) makeCylinder(division1, division2);
-    else if (curShape == CONE) makeCone(division1, division2);
-    else if (curShape == CUBE) makeStochasticTree(division1); // Add this
     else console.error(`Bad object type`);
 
     // create and bind vertex buffer
@@ -252,7 +253,7 @@ function createNewShape() {
         primitive: {
             topology: 'triangle-list', //<- MUST change to draw lines! 
             frontFace: 'cw', // this doesn't matter for lines
-            cullMode: 'back'
+            cullMode: 'none'
             // cullMode: 'none'
 
         }
@@ -301,7 +302,7 @@ function createNewShape() {
 
 
     // uniformValues = new Float32Array(angles);
-    uniformValues = new Float32Array(8); // 4 for theta, 4 for color
+    uniformValues = new Float32Array(12); // 4 for theta, 4 for color
     uniformBuffer = device.createBuffer({
         size: uniformValues.byteLength,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -387,6 +388,9 @@ function draw() {
     // coral color
     const c = CORAL_BASE_COLORS[coralMode];
     uniformValues.set(c, 4);
+
+    uniformValues[8] = camX;
+    uniformValues[9] = camY;
 
 
     // copy the values from JavaScript to the GPU

@@ -226,7 +226,7 @@ function createNewShape() {
             targets: [colorState]
         },
         depthStencil: { depthWriteEnabled: true, depthCompare: 'less', format: 'depth24plus' },
-        primitive: { topology: 'triangle-list', frontFace: 'cw', cullMode: 'none' }
+        primitive: { topology: 'triangle-list', frontFace: 'cw', cullMode: 'front' }
     };
 
     pipeline = device.createRenderPipeline(pipelineDesc);

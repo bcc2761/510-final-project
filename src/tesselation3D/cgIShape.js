@@ -57,10 +57,10 @@ function iterateGrammar(startString) {
     // Symbols: F=forward, [=push, ]=pop, +=yaw, -=yaw, &=pitch, ^=pitch, <=roll, >=roll
     rules = {
         'F': [
-            { prob: 0.20, res: "F[+F][-F]" },      // Left/right branching
-            { prob: 0.20, res: "F[&F][^F]" },      // Front/back branching
-            { prob: 0.20, res: "F[+&F][-^F]" },    // Combined XY branching
-            { prob: 0.20, res: "[+F][-F][&F][^F]" }, // Quad branching
+            { prob: 0.15, res: "F[+F][-F]" },      // Left/right branching
+            { prob: 0.15, res: "F[&F][^F]" },      // Front/back branching
+            { prob: 0.15, res: "F[+&F][-^F]" },    // Combined XY branching
+            { prob: 0.15, res: "[+F][-F][&F][^F]" }, // Quad branching
             { prob: 0.20, res: "F[&+F]" },         // Front-left branching
             { prob: 0.20, res: "F[<+F][>&F]" }     // Roll-based branching
         ]

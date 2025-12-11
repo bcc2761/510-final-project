@@ -1,46 +1,48 @@
-<!-- 
-tessellation.html
-Bennett Chang, Anna Leung
-CSCI-510 
--->
-
 <html>
 <head>
-    <title>CSCI-510: Final Project, L-System Tesselation</title>
+    <title>CSCI-510: Final Project, L-System Coral Tesselation</title>
 
-    <!-- vertex Shader -->
-<script id="shader" type="wgsl">
+    <!-- WGSL Shader: Handles vertex transformation and fragment coloring -->
+    <script id="shader" type="wgsl">
+        // Output structure passed from vertex to fragment shader
         struct VertexOutput {
-            @builtin(position) aVertexPosition: vec4<f32>,
-            @location(0) bary: vec3<f32>,
-            @location(1) isGround: f32,
-            @location(2) localPos: vec3<f32> // Used for the seabed pattern
+            @builtin(position) aVertexPosition: vec4<f32>,  // Clip-space position
+            @location(0) bary: vec3<f32>,                    // Barycentric coordinates for wireframe
+            @location(1) isGround: f32,                      // Flag: 1.0 if ground/sand, 0.0 if coral
+            @location(2) uv: vec2<f32>                       // Texture UV coordinates
         };
 
+        // Uniform data shared across all shader instances
         struct UniformStruct {
-             theta : vec4<f32>,       // Rotation angles
-             coralColor : vec4<f32>,  // Coral color
-             cameraPos : vec4<f32>    // Camera X and Y offset
+             theta : vec4<f32>,       // Rotation angles: (rotX, rotY, rotZ, unused)
+             coralColor : vec4<f32>,  // Base coral color (RGB) from mode selection
+             cameraPos : vec4<f32>    // Camera position offset (X, Y, unused, unused)
         };
 
+        // GPU resource bindings: uniforms, sampler, and textures
         @group(0) @binding(0) var<uniform> uniformStruct : UniformStruct;
+        @group(0) @binding(1) var mySampler: sampler;            // Linear texture sampler
+        @group(0) @binding(2) var sandTex: texture_2d<f32>;       // Sand texture for ground
+        @group(0) @binding(3) var coralTex: texture_2d<f32>;      // Coral texture for vegetation
 
+        // Vertex shader: transforms model space to clip space with camera control
         @vertex
-        fn vs_main(@location(0) inPos: vec3<f32>,
-                   @location(1) bary : vec3<f32>) -> VertexOutput {
+        fn vs_main(@location(0) inPos: vec3<f32>,        // Vertex position
+                   @location(1) bary : vec3<f32>,        // Barycentric coordinates
+                   @location(2) inUv : vec2<f32>) -> VertexOutput {  // Texture UV
             var out: VertexOutput;
 
-            // --- 1. DEFINE PROJECTION (The "Camera Lens") ---
-            // This replaces the manual scaling and defines a large "safe zone"
-            // for Z-depth (-5.0 to 5.0) so nothing gets clipped.
-            let left = -2.0;   let right = 2.0;
-            let bottom = -2.0; let top = 2.0;
-            let near = -5.0;   let far = 5.0;
+            // Orthographic projection matrix (fixed aspect ratio)
+            let left = -2.0;   let right = 2.0;      // Horizontal bounds
+            let bottom = -2.0; let top = 2.0;        // Vertical bounds
+            let near = -5.0;   let far = 5.0;        // Depth range
 
+            // Precomputed denominators for orthographic matrix
             let w = 1.0 / (right - left);
             let h = 1.0 / (top - bottom);
             let p = 1.0 / (far - near);
 
+            // Orthographic projection matrix
             var proj = mat4x4<f32>(
                 2.0 * w,  0.0,      0.0,      0.0,
                 0.0,      2.0 * h,  0.0,      0.0,
@@ -48,8 +50,7 @@ CSCI-510
                -(right+left)*w, -(top+bottom)*h, -near*p, 1.0
             );
 
-            // --- 2. DEFINE VIEW (Camera Movement) ---
-            // Uses the WASD values sent from JavaScript
+            // View matrix: applies camera pan offsets
             var view = mat4x4<f32>(
                 1.0, 0.0, 0.0, 0.0,
                 0.0, 1.0, 0.0, 0.0,
@@ -57,67 +58,53 @@ CSCI-510
                 uniformStruct.cameraPos.x, uniformStruct.cameraPos.y, 0.0, 1.0
             );
 
-            // --- 3. DEFINE ROTATION (Object Rotation) ---
+            // Precompute sin/cos for rotation matrices
             var c = cos(uniformStruct.theta);
             var s = sin(uniformStruct.theta);
 
-            var rx = mat4x4<f32> ( 
-                1.0, 0.0, 0.0, 0.0,
-                0.0, c.x, s.x, 0.0,
-                0.0, -s.x, c.x, 0.0,
-                0.0, 0.0, 0.0, 1.0 
-            );
+            // Rotation matrices around X, Y, Z axes
+            var rx = mat4x4<f32> ( 1.0, 0.0, 0.0, 0.0, 0.0, c.x, s.x, 0.0, 0.0, -s.x, c.x, 0.0, 0.0, 0.0, 0.0, 1.0 );
+            var ry = mat4x4<f32> ( c.y, 0.0, -s.y, 0.0, 0.0, 1.0, 0.0, 0.0, s.y, 0.0, c.y, 0.0, 0.0, 0.0, 0.0, 1.0 );
+            var rz = mat4x4<f32> ( c.z, s.z, 0.0, 0.0, -s.z, c.z, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 );
 
-            var ry = mat4x4<f32> ( 
-                c.y, 0.0, -s.y, 0.0,
-                0.0, 1.0, 0.0, 0.0,
-                s.y, 0.0, c.y, 0.0,
-                0.0, 0.0, 0.0, 1.0 
-            );
-
-            var rz = mat4x4<f32> ( 
-                c.z, s.z, 0.0, 0.0,
-                -s.z, c.z, 0.0, 0.0,
-                0.0, 0.0, 1.0, 0.0,
-                0.0, 0.0, 0.0, 1.0 
-            );
-
-            // Combine: Projection * View * Rotation * Vertex
+            // Apply full transformation: rotation → view pan → projection
             let worldPos = proj * view * rz * ry * rx * vec4<f32>(inPos, 1.0);
 
+            // Populate output structure
             out.aVertexPosition = worldPos;
             out.bary = bary;
-            out.localPos = inPos; // Pass original position for texturing
-            out.isGround = select(0.0, 1.0, inPos.y < -1.74);
+            out.uv = inUv; 
+            out.isGround = select(0.0, 1.0, inPos.y < -1.74);  // Classify terrain type based on Y coordinate
 
             return out;
         }
 
+        // Fragment shader: determines final color based on terrain type and texture
         @fragment
         fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-            
-            // 1. Define Colors
-            let sandLight = vec4<f32>(0.95, 0.90, 0.65, 1.0);
-            let sandDark  = vec4<f32>(0.85, 0.80, 0.55, 1.0);
+            // Sample both textures upfront to ensure uniform control flow (required by some drivers)
+            let sandColor = textureSample(sandTex, mySampler, in.uv);
+            let coralTexColor = textureSample(coralTex, mySampler, in.uv);
+
             var finalColor = vec4<f32>(0.0);
 
-            // 2. Determine Surface Color
             if (in.isGround > 0.5) {
-                // Checkerboard Pattern for Seabed
-                // Uses localPos so the texture sticks to the object
-                let pattern = step(0.0, sin(in.localPos.x * 10.0) * sin(in.localPos.z * 10.0));
-                finalColor = mix(sandDark, sandLight, pattern);
+                // Ground: Use sand texture directly
+                finalColor = sandColor;
             } else {
-                // Coral Gradient
+                // Vegetation: Blend coral texture with procedural gradient for depth
                 let base = uniformStruct.coralColor.rgb;
-                let h = clamp(in.bary.y + 0.5, 0.0, 1.0);
-                let dark  = base * 0.4;
-                let light = base + vec3<f32>(0.4);
-                finalColor = vec4<f32>(mix(dark, light, h), 1.0);
+                let h = clamp(in.bary.y + 0.5, 0.0, 1.0);  // Height-based gradient
+                
+                // Create gradient from dark to light based on height
+                let gradient = mix(base * 0.4, base + vec3<f32>(0.4), h);
+                
+                // Multiply texture color with procedural gradient for realistic shading
+                finalColor = vec4<f32>(gradient * coralTexColor.rgb, 1.0);
             }
 
-            // 3. Black Wireframe Edges
-            // Checks if the pixel is near the edge of a triangle
+            // Draw black wireframe edges using barycentric coordinates
+            // If any coordinate is near zero, pixel is near triangle edge
             if (in.bary.x < 0.02 || in.bary.y < 0.02 || in.bary.z < 0.02) {
                 finalColor = vec4<f32>(0.0, 0.0, 0.0, 1.0);
             }
@@ -125,64 +112,49 @@ CSCI-510
             return finalColor;
         }
     </script>
-
-
-    </script>
    
-    <!-- include the shape creation functions -->
     <script type="text/javascript" src="./cgIShape.js"></script>
 
-    <!-- include the main tesselation functions -->
     <script type="text/javascript" src="./tessMain.js"></script>
 
-    <!-- keyboard functions -->
+    <!-- JavaScript event handler for user input -->
     <script type="text/javascript">
-
+        // Keyboard event handler: processes user input for rotation, camera pan, and shape manipulation
         function gotKey(event) {
-
             var key = event.key;
 
-            //  incremental rotation
-            if (key == 'x')
-                angles[0] -= angleInc;
-            else if (key == 'y')
-                angles[1] -= angleInc;
-            else if (key == 'z')
-                angles[2] -= angleInc;
-            else if (key == 'X')
-                angles[0] += angleInc;
-            else if (key == 'Y')
-                angles[1] += angleInc;
-            else if (key == 'Z')
-                angles[2] += angleInc;
+            // Rotation controls: x/y/z (backward), X/Y/Z (forward)
+            if (key == 'x') angles[0] -= angleInc;
+            else if (key == 'y') angles[1] -= angleInc;
+            else if (key == 'z') angles[2] -= angleInc;
+            else if (key == 'X') angles[0] += angleInc;
+            else if (key == 'Y') angles[1] += angleInc;
+            else if (key == 'Z') angles[2] += angleInc;
 
-            // camera pan
-            if (key == 'w' || key == 'W')
-                camY += 0.1;
-            else if (key == 's' || key == 'S')
-                camY -= 0.1;
-            else if (key == 'a' || key == 'A')
-                camX -= 0.1;
-            else if (key == 'd' || key == 'D')
-                camX += 0.1;
+            // Camera pan controls: w/s for vertical, a/d for horizontal
+            if (key == 'w' || key == 'W') camY += 0.1;
+            else if (key == 's' || key == 'S') camY -= 0.1;
+            else if (key == 'a' || key == 'A') camX -= 0.1;
+            else if (key == 'd' || key == 'D') camX += 0.1;
 
-            // shape selection
+            // Tree generation: g/G generates new stochastic tree
             else if (key == 'g' || key == 'G') {
                 curShape = TREE;
                 generateNewTree();
             }
 
+            // Coral color cycling: b/B cycles through available colors
             else if (key === 'b' || key === 'B') {
                 coralMode = (coralMode + 1) % CORAL_BASE_COLORS.length;
             }
 
-
-            // tessellation control
+            // L-System growth: +/- adjusts tree depth (iterations)
             else if (key == '+') {
                 growthIterations++;
                 updateTreeDepth();
             }
 
+            // Tessellation subdivision: =/_ adjusts secondary subdivision level
             else if (key == '=') {
                 division2 = division2 + 1;
             }
@@ -198,7 +170,7 @@ CSCI-510
                 }
             }
 
-            // reset
+            // Reset: r/R restores default view and rotation
             else if (key == 'r' || key == 'R') {
                 angles[0] = anglesReset[0];
                 angles[1] = anglesReset[1];
@@ -207,31 +179,31 @@ CSCI-510
                 camY = 0.0;
             }
 
-            // create a new shape and do a redo a draw
+            // Regenerate shape and render with updated parameters
             createNewShape();
             draw();
         }
-
     </script>
 
+    <!-- Initialize WebGPU context on page load -->
     <script type="text/javascript">
-        // Call init once the webpage has loaded
         window.onload = init;
     </script>
 </head>
 
 <body>
-<h1>CSCI-510: Final Project, L-System Tessellation</h1>
+<h1>CSCI-510: Final Project, L-System Coral Tessellation</h1>
 <h2>Anna Leung & Bennett Chang</h2>
 <table>
     <tr>
+        <!-- WebGPU Canvas: 800x800 rendering surface -->
         <td><canvas id="webgpu" width="800" height="800">
             Your browser does not support the HTML5 canvas element.
         </canvas></td>
         
         <td>
             <h3>Controls</h3>
-            
+            <!-- Interactive control reference: keyboard shortcuts and their effects -->
             <table border="1">
             <tbody>
             <tr>
